@@ -1144,20 +1144,24 @@ render_prepared_os_window(
     for (unsigned int i = 0; i < tab->num_windows; i++) {
         if (tab->windows[i].visible) num_of_visible_windows++;
     }
-    for (unsigned int i = 0; i < tab->num_windows; i++) {
-        Window *w = tab->windows + i;
-        if (w->visible && WD.screen) {
-            bool is_active_window = i == tab->active_window;
-            if (is_active_window) active_window = w;
-            draw_cells(&WD, os_window, is_active_window, false, num_of_visible_windows == 1, w, NULL, now);
-            if (WD.screen->start_visual_bell_at | WD.screen->start_drag_overlay_at) set_maximum_wait(ANIMATION_SAMPLE_WAIT);
-            if (OPT(progress_bar) != PROGRESS_BAR_HIDDEN && WD.screen->progress_state == PROGRESS_STATE_INDETERMINATE) set_maximum_wait(ANIMATION_SAMPLE_WAIT);
-            WindowRenderData *trd = &w->window_title_render_data;
-            if (trd->screen && trd->geometry.right > trd->geometry.left && trd->geometry.bottom > trd->geometry.top)
-                draw_cells(trd, os_window, i == tab->active_window, true, false, NULL, w, now);
+    // Floating terminals are a separate z-layer, independent of creation order.
+    for (unsigned int layer = 0; layer < 2; layer++) {
+        for (unsigned int i = 0; i < tab->num_windows; i++) {
+            Window *w = tab->windows + i;
+            if (w->visible && WD.screen && w->floating == (layer == 1)) {
+                bool is_active_window = i == tab->active_window;
+                if (is_active_window) active_window = w;
+                draw_cells(&WD, os_window, is_active_window, false, num_of_visible_windows == 1, w, NULL, now);
+                if (WD.screen->start_visual_bell_at | WD.screen->start_drag_overlay_at) set_maximum_wait(ANIMATION_SAMPLE_WAIT);
+                if (OPT(progress_bar) != PROGRESS_BAR_HIDDEN && WD.screen->progress_state == PROGRESS_STATE_INDETERMINATE)
+                    set_maximum_wait(ANIMATION_SAMPLE_WAIT);
+                WindowRenderData *trd = &w->window_title_render_data;
+                if (trd->screen && trd->geometry.right > trd->geometry.left && trd->geometry.bottom > trd->geometry.top)
+                    draw_cells(trd, os_window, i == tab->active_window, true, false, NULL, w, now);
+            }
         }
+        if (layer == 0) draw_rounded_borders(br, active_window_bg, num_visible_windows, all_windows_have_same_bg, os_window);
     }
-    draw_rounded_borders(br, active_window_bg, num_visible_windows, all_windows_have_same_bg, os_window);
     setup_os_window_for_rendering(os_window, tab, active_window, false, now);
     if (global_state.thumbnail_callback.os_window == os_window->id) {
         thumbnail_callback(os_window);

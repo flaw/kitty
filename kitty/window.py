@@ -90,6 +90,7 @@ from .fast_data_types import (
     remove_timer,
     replace_c0_codes_except_nl_space_tab,
     set_redirect_keys_to_overlay,
+    set_window_floating,
     set_window_logo,
     set_window_padding,
     set_window_render_data,
@@ -290,6 +291,8 @@ def decode_cmdline(x: str) -> str:
 
 
 class WindowDict(TypedDict):
+    is_floating: bool
+    is_visible: bool
     id: int
     is_focused: bool
     is_active: bool
@@ -799,6 +802,7 @@ class Window:
     window_custom_type: str = ''
     is_resize_overlay: bool = False
     overlay_type = OverlayType.transient
+    is_floating: bool = False
     initial_ignore_focus_changes: bool = False
     initial_ignore_focus_changes_context_manager_in_operation: bool = False
     creation_spec: WindowCreationSpec | None = None
@@ -1171,6 +1175,8 @@ class Window:
     def set_geometry(self, new_geometry: WindowGeometry) -> None:
         if self.destroyed:
             return
+        if self.is_floating:
+            set_window_floating(self.os_window_id, self.tab_id, self.id, True, self.effective_border())
         # Determine if we need a title bar and compute adjusted dimensions
         opts = get_options()
         position = opts.window_title_bar
@@ -2538,6 +2544,8 @@ class Window:
             neighbors_map = {}
         return {
             'id': self.id,
+            'is_floating': self.is_floating,
+            'is_visible': self.is_visible_in_layout,
             'is_focused': is_focused,
             'is_active': is_active,
             'title': self.title,
@@ -2587,6 +2595,8 @@ class Window:
             ans['window_custom_type'] = self.window_custom_type
         if self.overlay_type is not OverlayType.transient:
             ans['overlay_type'] = self.overlay_type.value
+        if self.is_floating:
+            ans['is_floating'] = True
         if self.user_vars:
             ans['user_vars'] = self.user_vars
         return ans

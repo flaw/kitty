@@ -2551,7 +2551,10 @@ draw_cells(
             ? (is_tab_bar || is_active_window ? 1.0f : inactive_text_alpha)
             : (is_tab_bar || (!is_single_window && is_active_window) || (is_single_window && screen->cursor_render_info.is_focused) ? 1.0f
                                                                                                                                     : inactive_text_alpha);
-    float bg_alpha = effective_os_window_alpha(os_window);
+    // A floating terminal must occlude the panes beneath it even when the OS
+    // window is transparent or uses a background image.
+    const bool floating = window && window->floating;
+    float bg_alpha = floating ? 1.f : effective_os_window_alpha(os_window);
 
     color_type default_bg = cell_update_uniform_block(
         srd->vao_idx, screen, uniform_buffer, color_table_buffer, &screen->cursor_render_info, os_window, current_inactive_text_alpha, bg_alpha);
@@ -2577,12 +2580,26 @@ draw_cells(
         .grd = grman_render_data(grman),
         .window_logo = wl,
         .inactive_text_alpha = current_inactive_text_alpha,
-        .has_background_image = has_bgimage(os_window),
+        .has_background_image = !floating && has_bgimage(os_window),
         .background_color = default_bg,
-        .bg_alpha = effective_os_window_alpha(os_window),
+        .bg_alpha = bg_alpha,
         .now = now,
     };
     screen->reload_all_gpu_data = false;
+    if (floating) {
+        const WindowGeometry *g = &srd->geometry;
+        Viewport rect = {
+            .left = g->left - g->spaces.left,
+            .top = g->top - g->spaces.top,
+            .width = g->right - g->left + g->spaces.left + g->spaces.right,
+            .height = g->bottom - g->top + g->spaces.top + g->spaces.bottom,
+        };
+        color_type border_color = is_active_window && OPT(active_border_color) >= 0 ? OPT(active_border_color) : OPT(inactive_border_color);
+        draw_rounded_rect(rect, os_window->viewport_height, window->floating_border_width, 0, border_color, default_bg, 1.f, default_bg, 1.f);
+        // draw_rounded_rect binds another program; restore the cell VAO/uniforms.
+        bind_vertex_array(srd->vao_idx);
+        set_cell_uniforms(false);
+    }
     save_viewport_using_top_left_origin(ui.screen_left, ui.screen_top, ui.screen_width, ui.screen_height, ui.full_framebuffer_height);
     if (ui.os_window->needs_layers) draw_cells_with_layers(&ui, srd->vao_idx);
     else draw_cells_without_layers(&ui, srd->vao_idx);

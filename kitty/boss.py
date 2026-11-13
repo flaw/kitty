@@ -2904,6 +2904,23 @@ class Boss:
     def input_unicode_character(self) -> None:
         self.run_kitten_with_metadata('unicode_input', window=self.window_for_dispatch)
 
+    @ac('win', 'Toggle a persistent, centered floating shell belonging to the current tab')
+    def toggle_floating_window(self) -> None:
+        tab = self.active_tab
+        if tab is None:
+            return
+        if tab.windows.floating_groups:
+            group = tab.windows.floating_groups[0]
+            tab.windows.set_floating_visible(group, not group.floating_visible)
+            tab.relayout()
+        else:
+            source = tab.active_window
+            tab.new_window(
+                cwd_from=CwdRequest(source) if source is not None else None,
+                override_title='Floating shell',
+                floating=True,
+            )
+
     @ac(
         'misc',
         """

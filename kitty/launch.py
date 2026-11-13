@@ -87,7 +87,7 @@ of the active window in the tab is used as the tab title. The special value
 --type
 type=choices
 default=window
-choices=window,window-dock,tab,tab-dock,os-window-dock,os-window,os-panel,overlay,overlay-main,background,clipboard,primary
+choices=window,floating,window-dock,tab,tab-dock,os-window-dock,os-window,os-panel,overlay,overlay-main,background,clipboard,primary
 Where to launch the child process:
 
 :code:`window`
@@ -117,6 +117,10 @@ Where to launch the child process:
 :code:`os-window`
     A new :term:`operating system window <os_window>`.  Not available when the
     :doc:`launch <launch>` command is used in :ref:`startup sessions <sessions>`.
+
+:code:`floating`
+    A persistent terminal centered above the current tab's tiled windows. It
+    does not change the layout and is hidden when switching away from the tab.
 
 :code:`overlay`
     An :term:`overlay window <overlay>` covering the current active kitty window
@@ -273,6 +277,11 @@ from arbitrary processes. In particular, this means, if you are running a shell 
 window and the shell has set env vars in its rc files, these will **not** be copied.
 To copy that environment, use either the :ref:`clone-in-kitty <clone_shell>` feature
 or the kitty remote control feature with :option:`kitten @ launch --copy-env`.
+
+
+--floating-hidden
+type=bool-set
+Start a :code:`--type=floating` window hidden. Its process remains running.
 
 
 --location
@@ -675,6 +684,8 @@ class LaunchKwds(TypedDict):
     overlay_for: int | None
     dock: DockSpec | None
     os_window_dock: bool
+    floating: bool
+    floating_hidden: bool
     stdin: bytes | None
     hold: bool
     bias: float | None
@@ -819,6 +830,8 @@ def _launch(
         'overlay_for': None,
         'dock': None,
         'os_window_dock': False,
+        'floating': opts.type == 'floating',
+        'floating_hidden': opts.floating_hidden,
         'stdin': None,
         'hold': False,
         'bias': None,

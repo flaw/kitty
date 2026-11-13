@@ -66,6 +66,8 @@ class WindowGroup:
         self.dock_scope: DockScope = dock_scope
         # The groups docked to the edges of this group, outermost first
         self.docks: list[WindowGroup] = []
+        self.is_floating = False
+        self.floating_visible = True
         # The geometry the layout allocated to this group, includes the area of its docks
         self.allocated_geometry: WindowGeometry | None = None
 
@@ -139,6 +141,8 @@ class WindowGroup:
         }
         if self.dock is not None:
             ans['dock'] = self.dock_as_dict()
+        if self.is_floating:
+            ans['floating_visible'] = self.floating_visible
         if self.docks:
             ans['docks'] = [d.serialize_state() for d in self.docks]
         return ans
@@ -164,6 +168,8 @@ class WindowGroup:
         }
         if self.dock is not None:
             ans['dock'] = self.dock_as_dict()
+        if self.is_floating:
+            ans['floating_visible'] = self.floating_visible
         if self.docks:
             ans['docks'] = [d.id for d in self.docks]
         return ans
@@ -238,6 +244,9 @@ class WindowList:
         self.groups: list[WindowGroup] = []
         # Groups docked to the edges of the tab, outermost first
         self.tab_docks: list[WindowGroup] = []
+        # Tab-owned floating groups never participate in the tiled layout.
+        self.floating_groups: list[WindowGroup] = []
+        self._active_floating_id = 0
         # Groups docked to the edges of the OS window, outermost first. This
         # list is shared by all the tabs in an OS window, so that every tab
         # reserves space for them. Their windows are present only in the tab
@@ -271,6 +280,7 @@ class WindowList:
             'active_group_idx': self.active_group_idx,
             'active_group_history': list(self.active_group_history),
             'window_groups': [g.serialize_state() for g in self.groups],
+            'floating_groups': [g.serialize_state() for g in self.floating_groups],
             'tab_docks': [g.serialize_state() for g in self.tab_docks],
             'os_window_docks': [g.serialize_state() for g in self.hosted_os_window_docks()],
         }
@@ -381,11 +391,12 @@ class WindowList:
 
     def set_active_group_idx(self, i: int, notify: bool = True) -> bool:
         changed = False
-        if 0 <= i < len(self.groups) and (i != self._active_group_idx or self._active_dock_id):
+        if 0 <= i < len(self.groups) and (i != self._active_group_idx or self._active_dock_id or self._active_floating_id):
             old_active_window = self.active_window
             self._push_to_history(self.active_group)
             self._active_group_idx = i
             self._active_dock_id = 0
+            self._active_floating_id = 0
             new_active_window = self.active_window
             if old_active_window is not new_active_window:
                 if notify:
@@ -394,11 +405,12 @@ class WindowList:
         return changed
 
     def _set_active_dock(self, dock: WindowGroup, notify: bool = True) -> bool:
-        if dock.dock is None or not dock.dock.focusable or dock.id == self._active_dock_id:
+        if dock.dock is None or not dock.dock.focusable or (dock.id == self._active_dock_id and not self._active_floating_id):
             return False
         old_active_window = self.active_window
         self._push_to_history(self.active_group)
         self._active_dock_id = dock.id
+        self._active_floating_id = 0
         # A docked group is part of its owner, so focusing it makes the owner
         # the active normal group
         if (owner := self.dock_owner(dock)) is not None:
@@ -410,7 +422,34 @@ class WindowList:
             return True
         return False
 
+    def set_floating_visible(self, group: WindowGroup, visible: bool) -> None:
+        if group not in self.floating_groups:
+            raise ValueError('Floating group does not belong to this tab')
+        old_active_window = self.active_window
+        group.floating_visible = visible
+        if visible:
+            self._push_to_history(self.active_group)
+            self._active_floating_id = group.id
+        elif self._active_floating_id == group.id:
+            self._active_floating_id = 0
+        new_active_window = self.active_window
+        if old_active_window is not new_active_window:
+            self.notify_on_active_window_change(old_active_window, new_active_window)
+
+    def hide_floating_windows(self) -> None:
+        for group in self.floating_groups:
+            self.set_floating_visible(group, False)
+
     def _set_active_group(self, g: WindowGroup, notify: bool = True) -> bool:
+        if g.is_floating:
+            if not g.floating_visible or g.id == self._active_floating_id:
+                return False
+            old_active_window = self.active_window
+            self._push_to_history(self.active_group)
+            self._active_floating_id = g.id
+            if notify:
+                self.notify_on_active_window_change(old_active_window, self.active_window)
+            return True
         if g.dock is not None:
             return self._set_active_dock(g, notify)
         for i, q in enumerate(self.groups):
@@ -507,11 +546,13 @@ class WindowList:
         yield from self.groups
         yield from self.iter_dock_groups()
         yield from self.orphaned_docks
+        yield from self.floating_groups
 
     def iter_visible_groups(self) -> Iterator[WindowGroup]:
         "All visible groups, normal and docked"
         yield from self.iter_all_layoutable_groups(only_visible=True)
         yield from self.iter_dock_groups(only_visible=True)
+        yield from (g for g in self.floating_groups if g.floating_visible)
 
     def dock_owner(self, dock: WindowGroup) -> WindowGroup | None:
         "The normal group a dock belongs to, or None for tab and OS window docks"
@@ -641,6 +682,10 @@ class WindowList:
     @property
     def active_group(self) -> WindowGroup | None:
         "The group that has focus, which may be a dock"
+        if self._active_floating_id:
+            for g in self.floating_groups:
+                if g.id == self._active_floating_id and g.floating_visible:
+                    return g
         return self.active_dock or self.active_main_group
 
     @property
@@ -681,6 +726,8 @@ class WindowList:
         dock: DockSpec | None = None,
         dock_owner: WindowGroup | None = None,
         os_window_dock: bool = False,
+        floating: bool = False,
+        floating_hidden: bool = False,
     ) -> WindowGroup:
         """
         Add a window. When dock is specified a new docked group is created, at
@@ -698,6 +745,12 @@ class WindowList:
 
         if group_of is not None:
             target_group = self.group_for_window(group_of)
+        if target_group is None and floating:
+            target_group = WindowGroup()
+            target_group.is_floating = True
+            target_group.floating_visible = not floating_hidden
+            make_active = make_active and not floating_hidden
+            self.floating_groups.append(target_group)
         if target_group is None and dock is not None:
             if dock_owner is not None:
                 target_group = WindowGroup(dock, 'window')
@@ -747,7 +800,11 @@ class WindowList:
         if group is not None:
             group.remove_window(q)
             if not group:
-                if group.dock is None:
+                if group.is_floating:
+                    self.floating_groups.remove(group)
+                    if self._active_floating_id == group.id:
+                        self._active_floating_id = 0
+                elif group.dock is None:
                     self._remove_main_group(group)
                 else:
                     self._remove_dock_group(group)
@@ -806,7 +863,7 @@ class WindowList:
             self.set_active_group_idx(wrap_increment(self.active_group_idx, self.num_groups, delta))
 
     def move_window_group(self, by: int | None = None, to_group: int | None = None) -> bool:
-        if self.active_group_idx < 0 or not self.groups or self._active_dock_id:
+        if self.active_group_idx < 0 or not self.groups or self._active_dock_id or self._active_floating_id:
             return False
         target = -1
         if by is not None:
@@ -831,7 +888,7 @@ class WindowList:
         preserves the relative order of all other groups.
         """
         src_idx = self.active_group_idx
-        if src_idx < 0 or not self.groups or self._active_dock_id:
+        if src_idx < 0 or not self.groups or self._active_dock_id or self._active_floating_id:
             return False
         target_idx = next((i for i, g in enumerate(self.groups) if g.id == target_group_id), -1)
         if target_idx < 0 or src_idx == target_idx:

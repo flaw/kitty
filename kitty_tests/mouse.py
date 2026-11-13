@@ -19,6 +19,7 @@ from kitty.fast_data_types import (
     send_mock_mouse_event_to_window,
     send_mock_scroll_event_to_window,
     set_options,
+    test_floating_mouse_target,
     update_mock_pointer,
 )
 
@@ -42,6 +43,14 @@ def send_mouse_event(
 
 
 class TestMouse(BaseTest):
+    def test_floating_mouse_hit_testing(self):
+        window = create_mock_window(self.create_screen())
+        for x, y in ((150, 150), (95, 150), (305, 150), (150, 95), (150, 255), (150, 101)):
+            with self.subTest(x=x, y=y):
+                self.ae(test_floating_mouse_target(window, x, y, True), 2)
+                self.ae(test_floating_mouse_target(window, x, y, False), 1)
+        self.ae(test_floating_mouse_target(window, 20, 20, True), 1)
+
     def test_link_hover_modifiers(self):
         s = self.create_screen(cols=60)
         s.draw('https://example.invalid/')

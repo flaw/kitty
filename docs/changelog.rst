@@ -9,6 +9,15 @@ To update |kitty|, :doc:`follow the instructions <binary>`.
 Recent major new features
 ---------------------------
 
+Floating terminals
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add tab-owned :ref:`floating terminals <floating_windows>` rendered above tiled
+windows without creating a separate OS window. The ``toggle_floating_window``
+action toggles a persistent centered shell, restoring focus when hidden, and
+``launch --type=floating`` opens other programs in this layer. Floating terminals
+are saved in sessions and closed with their owning tab.
+
 Docked windows [0.50]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 

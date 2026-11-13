@@ -47,6 +47,9 @@ in
         [
           ncurses
           pkg-config
+          pkgs.ruff
+          pkgs.ty
+          pkgs.clang-tools
           sphinx
           furo
           sphinx-copybutton

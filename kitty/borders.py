@@ -94,7 +94,8 @@ class Borders:
             rects.append(Border(*br, BorderColor.default_bg))
         rects.extend(tab_bar_rects)
         bw = 0
-        groups = tuple(all_windows.iter_visible_groups())
+        # Floating frames are painted with their cells, above the tiled panes.
+        groups = tuple(g for g in all_windows.iter_visible_groups() if not g.is_floating)
         if groups:
             bw = groups[0].effective_border()
         draw_borders = bw > 0 and draw_window_borders

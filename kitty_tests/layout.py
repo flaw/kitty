@@ -113,6 +113,104 @@ class TestLayout(BaseTest):
         super().setUp()
         self.set_options({'tab_bar_style': 'hidden'})
 
+    def test_floating_window_layout_and_focus(self):
+        for cls in (Tall, Fat, Grid, Horizontal, Vertical, Splits, Stack):
+            with self.subTest(layout=cls.name):
+                layout = create_layout(cls)
+                windows = create_windows(layout, 3)
+                original_set_dimensions = layout._set_dimensions
+
+                def set_dimensions(all_windows):
+                    original_set_dimensions(all_windows)
+                    lgd.central = Region((40, 60, 1239, 859, 1200, 800))
+                    lgd.cell_width, lgd.cell_height = 10, 20
+
+                layout._set_dimensions = set_dimensions
+                layout(windows)
+                before = [w.geometry for w in windows]
+                previous = windows.active_window
+                floating = Window(99)
+                group = windows.add_window(floating, floating=True)
+                layout(windows)
+                self.ae(windows.num_groups, 3)
+                self.ae([w.geometry for group in windows.groups for w in group], before)
+                self.ae(windows.active_window, floating)
+                self.ae(layout.neighbors_for_any_window(floating, windows), {})
+                self.assertTrue(floating.is_visible_in_layout)
+                g = floating.geometry
+                self.assertLessEqual(abs((g.left + g.right) / 2 - 640), 1)
+                self.assertLessEqual(abs((g.top + g.bottom) / 2 - 460), 1)
+                self.assertGreater(g.xnum, 0)
+                self.assertGreater(g.ynum, 0)
+                self.assertLess(g.right - g.left, 1200)
+                self.assertLess(g.bottom - g.top, 800)
+                windows.set_floating_visible(group, False)
+                layout(windows)
+                self.ae(windows.active_window, previous)
+                self.assertFalse(floating.is_visible_in_layout)
+                self.ae(floating.geometry, g)
+                windows.set_floating_visible(group, True)
+                layout(windows)
+                self.ae(windows.active_window, floating)
+                self.assertTrue(floating.is_visible_in_layout)
+                # Tiled windows created later must not affect the floating group.
+                windows.add_window(Window(100))
+                layout(windows)
+                self.ae(windows.num_groups, 4)
+                self.ae(floating.geometry, g)
+                windows.set_active_window_group_for(floating)
+                windows.remove_window(floating)
+                layout(windows)
+                self.assertFalse(windows.floating_groups)
+                self.ae(windows.active_window.id, 100)
+
+    def test_hidden_floating_window_and_overlay(self):
+        layout = create_layout(Stack)
+        windows = create_windows(layout, 2)
+        previous = windows.active_window
+        floating = Window(99)
+        group = windows.add_window(floating, floating=True, floating_hidden=True)
+        layout(windows)
+        self.ae(windows.active_window, previous)
+        self.assertFalse(floating.is_visible_in_layout)
+        self.ae(len(windows.serialize_layout_state()['window_groups']), 2)
+        windows.set_floating_visible(group, True)
+        overlay = Window(100)
+        windows.add_window(overlay, group_of=floating)
+        layout(windows)
+        self.assertFalse(floating.is_visible_in_layout)
+        self.assertTrue(overlay.is_visible_in_layout)
+        windows.hide_floating_windows()
+        layout(windows)
+        self.assertFalse(overlay.is_visible_in_layout)
+        self.ae(windows.active_window, previous)
+        windows.remove_window(overlay)
+        windows.set_floating_visible(group, True)
+        layout(windows)
+        self.assertTrue(floating.is_visible_in_layout)
+        self.ae(windows.active_window, floating)
+
+    def test_floating_window_tab_isolation_and_resize(self):
+        first_layout = create_layout(Tall)
+        first = create_windows(first_layout, 2)
+        first_float = Window(90)
+        first.add_window(first_float, floating=True)
+        second_layout = create_layout(Tall)
+        second = create_windows(second_layout, 2)
+        second_float = Window(91)
+        second.add_window(second_float, floating=True)
+        first.hide_floating_windows()
+        first_layout(first)
+        second_layout(second)
+        self.assertFalse(first_float.is_visible_in_layout)
+        self.assertTrue(second_float.is_visible_in_layout)
+        self.ae(second.active_window, second_float)
+        # Very small content areas must not produce negative terminal dimensions.
+        self.assertGreaterEqual(first_float.geometry.xnum, 0)
+        self.assertGreaterEqual(first_float.geometry.ynum, 0)
+        self.ae(len(first.groups), 2)
+        self.ae(len(second.groups), 2)
+
     def test_window_border_radius_geometry(self):
         q = create_layout(Splits)
         windows = create_windows(q, 1)

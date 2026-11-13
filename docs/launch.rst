@@ -32,6 +32,35 @@ see :ref:`docks`::
 
     map f1 launch --type=window-dock --dock-edge=bottom --dock-size=10
 
+.. _floating_windows:
+
+Floating terminals
+~~~~~~~~~~~~~~~~~~~~
+
+To toggle a persistent shell centered over the current tab's tiled windows::
+
+    map cmd+f toggle_floating_window
+
+On first use, the shell starts in the focused window's working directory.
+Subsequent presses show or hide the same terminal, preserving its process,
+working directory and scrollback. Hiding restores focus to the previous tiled
+window or dock. Switching tabs hides the float without terminating it, and
+closing the tab (or its last tiled window) closes its floating terminals too.
+There is no separate OS window or native show/hide animation.
+
+The floating terminal is at most 100 columns by 28 lines and occupies at most
+80% of the tab's content area. It is recentered on resize and does not change
+split sizes or the selected layout. Its background is opaque so that underlying
+terminal contents do not show through. Dragging and interactive resizing of
+floating terminals are not currently supported.
+
+To launch a specific program in a floating terminal::
+
+    map f2 launch --type=floating --cwd=current htop
+
+Use ``--floating-hidden`` to start it hidden. Floating terminals, including their
+visibility, are included when saving :doc:`sessions <sessions>`.
+
 To run multiple commands in a shell, use::
 
     map f1 launch sh -c "ls && exec zsh"

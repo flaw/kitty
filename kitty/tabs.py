@@ -529,6 +529,11 @@ class Tab:  # {{{
             if d.dock is not None:
                 groups.append(d)
                 dock_args[d.id] = d.dock.as_launch_args('tab')
+        for g in self.windows.floating_groups:
+            groups.append(g)
+            dock_args[g.id] = ['--type=floating', '--keep-focus']
+            if not g.floating_visible:
+                dock_args[g.id].append('--floating-hidden')
         os_window_dock_ids: set[int] = set()
         for d in os_window_docks:
             if d.dock is not None:
@@ -995,19 +1000,30 @@ class Tab:  # {{{
         dock: DockSpec | None = None,
         dock_owner: WindowGroup | None = None,
         os_window_dock: bool = False,
+        floating: bool = False,
+        floating_hidden: bool = False,
     ) -> None:
-        self.current_layout.add_window(
-            self.windows,
-            window,
-            location,
-            overlay_for,
-            put_overlay_behind=overlay_behind,
-            bias=bias,
-            next_to=next_to,
-            dock=dock,
-            dock_owner=dock_owner,
-            os_window_dock=os_window_dock,
-        )
+        if floating:
+            self.windows.add_window(window, floating=True, floating_hidden=floating_hidden)
+        else:
+            self.current_layout.add_window(
+                self.windows,
+                window,
+                location,
+                overlay_for,
+                put_overlay_behind=overlay_behind,
+                bias=bias,
+                next_to=next_to,
+                dock=dock,
+                dock_owner=dock_owner,
+                os_window_dock=os_window_dock,
+            )
+        group = self.windows.group_for_window(window)
+        if group is not None and group.is_floating:
+            from .fast_data_types import set_window_floating
+
+            window.is_floating = True
+            set_window_floating(self.os_window_id, self.id, window.id, True, window.effective_border())
         if os_window_dock:
             self.os_window_docks_changed()
         if overlay_behind and (w := self.active_window):
@@ -1047,6 +1063,8 @@ class Tab:  # {{{
         restored_scrollback: bytes = b'',
         os_window_dock: bool = False,
         launch_request: LaunchRequest | None = None,
+        floating: bool = False,
+        floating_hidden: bool = False,
     ) -> Window:
         """
         Create a new window. When dock is specified, the window is docked to
@@ -1114,6 +1132,8 @@ class Tab:  # {{{
             dock=dock,
             dock_owner=dock_owner,
             os_window_dock=os_window_dock,
+            floating=floating,
+            floating_hidden=floating_hidden,
         )
         if marker:
             try:
@@ -1190,6 +1210,7 @@ class Tab:  # {{{
         doomed = [w for d in self.windows.orphaned_docks if d not in orphans_before for w in d]
         if had_normal_windows and not self.windows.groups:
             doomed.extend(w for d in self.windows.tab_docks for w in d)
+            doomed.extend(w for g in self.windows.floating_groups for w in g)
         if doomed:
             boss = get_boss()
             for w in doomed:
@@ -1482,7 +1503,7 @@ class Tab:  # {{{
                 )
 
     def list_groups(self) -> list[dict[str, Any]]:
-        return [g.as_simple_dict() for g in self.windows.groups] + [g.as_simple_dict() for g in self.windows.iter_dock_groups()]
+        return [g.as_simple_dict() for g in self.windows.iter_all_groups()]
 
     def matches_query(
         self, field: str, query: str, active_tab_manager: Optional['TabManager'] = None, active_session: str = '', most_recent_session: str = ''
@@ -1747,6 +1768,10 @@ class TabManager:  # {{{
         return count < 1
 
     def _set_active_tab(self, idx: int, store_in_history: bool = True) -> None:
+        old_tab = self.active_tab
+        if old_tab is not None and idx != self.active_tab_idx:
+            old_tab.windows.hide_floating_windows()
+            old_tab.relayout()
         if store_in_history:
             self.active_tab_idx = idx
         else:

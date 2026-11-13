@@ -1073,6 +1073,19 @@ mouse_region(bool detect_borders, bool detect_title_bar) {
     }
     if (in_central && w->num_tabs > 0) {
         Tab *t = global_state.callback_os_window->tabs + global_state.callback_os_window->active_tab;
+        // Hit test floats before tiled borders/cells. Their frame also consumes
+        // clicks so input cannot leak into a pane underneath the floating shell.
+        for (size_t i = t->num_windows; i > 0; i--) {
+            Window *win = t->windows + i - 1;
+            if (!win->floating || !win->visible || !win->render_data.screen) continue;
+            const WindowGeometry *g = &win->render_data.geometry;
+            if (w->mouse_x >= g->left - g->spaces.left && w->mouse_x < g->right + g->spaces.right && w->mouse_y >= g->top - g->spaces.top &&
+                w->mouse_y < g->bottom + g->spaces.bottom) {
+                ans.window = win;
+                ans.window_idx = i - 1;
+                return ans;
+            }
+        }
         if (detect_borders && num_visible_windows(t) > 1) {
             id_type window_id = 0;
             double dpi = (w->fonts_data->logical_dpi_x + w->fonts_data->logical_dpi_y) / 2.;
@@ -2271,9 +2284,49 @@ send_mock_scroll_event_to_window(PyObject *self UNUSED, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+static PyObject *
+test_floating_mouse_target(PyObject *self UNUSED, PyObject *args) {
+    PyObject *capsule;
+    double x, y;
+    int visible;
+    if (!PyArg_ParseTuple(args, "O!ddp", &PyCapsule_Type, &capsule, &x, &y, &visible)) return NULL;
+    Window *mock = PyCapsule_GetPointer(capsule, "Window");
+    if (!mock) return NULL;
+    Screen *screen = mock->render_data.screen;
+    const WindowGeometry tiled = {.right = 500, .bottom = 400};
+    const WindowGeometry floating = {.left = 100, .top = 100, .right = 300, .bottom = 250, .spaces = {10, 10, 10, 10}};
+    // A newer tiled window and a tiled border overlap the floating frame.
+    Window windows[] = {
+        {.id = 1, .visible = true, .render_data = {.screen = screen, .geometry = tiled}},
+        {.id = 2, .visible = visible, .floating = true, .render_data = {.screen = screen, .geometry = floating}},
+        {.id = 3, .visible = true, .render_data = {.screen = screen, .geometry = tiled}},
+    };
+    BorderRect border = {.border_type = 1, .horizontal = true, .px = {.left = 0, .top = 100, .right = 500, .bottom = 102}};
+    Tab tab = {.windows = windows, .num_windows = 3, .border_rects = {.rect_buf = &border, .num_border_rects = 1}};
+    struct {
+        FONTS_DATA_HEAD
+    } fonts = {.logical_dpi_x = 72, .logical_dpi_y = 72, .fcm = {.cell_width = 10, .cell_height = 20}};
+    OSWindow osw = {
+        .tabs = &tab,
+        .num_tabs = 1,
+        .has_too_few_tabs = true,
+        .fonts_data = (FONTS_DATA_HANDLE)&fonts,
+        .viewport_width = 500,
+        .viewport_height = 400,
+        .mouse_x = x,
+        .mouse_y = y,
+    };
+    OSWindow *saved = global_state.callback_os_window;
+    global_state.callback_os_window = &osw;
+    MouseRegion hit = mouse_region(true, true);
+    global_state.callback_os_window = saved;
+    return PyLong_FromUnsignedLongLong(hit.window ? hit.window->id : 0);
+}
+
 static PyMethodDef module_methods[] = {
     {"send_mouse_event", (PyCFunction)(void (*)(void))(send_mouse_event), METH_VARARGS | METH_KEYWORDS, NULL},
     METHODB(test_encode_mouse, METH_VARARGS),
+    METHODB(test_floating_mouse_target, METH_VARARGS),
     METHODB(test_scale_scroll, METH_VARARGS),
     METHODB(test_mapped_scroll_steps, METH_VARARGS),
     METHODB(send_mock_mouse_event_to_window, METH_VARARGS),

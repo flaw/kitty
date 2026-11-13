@@ -1492,6 +1492,19 @@ PYWRAP1(set_window_render_data) {
 #undef S
 }
 
+PYWRAP1(set_window_floating) {
+    id_type os_window_id, tab_id, window_id;
+    int floating;
+    unsigned int border_width;
+    PA("KKKpI", &os_window_id, &tab_id, &window_id, &floating, &border_width);
+    WITH_WINDOW(os_window_id, tab_id, window_id);
+    window->floating = floating;
+    window->floating_border_width = border_width;
+    osw->needs_render = true;
+    END_WITH_WINDOW;
+    Py_RETURN_NONE;
+}
+
 PYWRAP1(update_window_visibility) {
     id_type os_window_id, tab_id, window_id;
     int visible;
@@ -2222,6 +2235,7 @@ static PyMethodDef module_methods[] = {
     MW(set_tab_bar_render_data, METH_VARARGS),
     MW(set_window_title_bar_render_data, METH_VARARGS),
     MW(set_window_render_data, METH_VARARGS),
+    MW(set_window_floating, METH_VARARGS),
     MW(set_window_drag_overlay, METH_VARARGS),
     MW(set_window_padding, METH_VARARGS),
     MW(viewport_for_window, METH_VARARGS),

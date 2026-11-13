@@ -494,7 +494,7 @@ class Layout:
         docked to and of the docks next to it at the same edge.
         """
         group = all_windows.group_for_window(window)
-        if group is None:
+        if group is None or group.is_floating:
             return {}
         if group.dock is None:
             return self._neighbors_with_docks(window, group, all_windows)
@@ -664,6 +664,9 @@ class Layout:
         for dock in all_windows.orphaned_docks:
             for window in dock:
                 window.set_visible_in_layout(False)
+        for group in all_windows.floating_groups:
+            for window in group:
+                window.set_visible_in_layout(group.floating_visible and window.id == group.active_window_id)
 
     def _set_dimensions(self, all_windows: WindowList) -> None:
         full_area, tab_bar, vw, vh, lgd.cell_width, lgd.cell_height = viewport_for_window(self.os_window_id)
@@ -719,12 +722,42 @@ class Layout:
         if all_windows.groups:
             self.do_layout(all_windows)
         self.layout_docks(all_windows)
+        self.layout_floating_groups(all_windows)
         # Computed from the final geometry of the windows, as it can differ
         # from what the layout gave them, see WindowGroup.set_content_geometry()
         self.blank_rects = list(self.collapsed_margin_rects)
         for group in all_windows.iter_visible_groups():
-            if (geom := group.geometry) is not None:
+            if not group.is_floating and (geom := group.geometry) is not None:
                 self.blank_rects.extend(blank_rects_for_window(geom))
+
+    def layout_floating_groups(self, all_windows: WindowList) -> None:
+        # Use the tab content area, not the monitor or the focused split. Hidden
+        # floats also get geometry so their PTYs launch and survive resizes.
+        area = lgd.central
+        width = min(100 * lgd.cell_width, max(1, int(area.width * 0.8)))
+        height = min(28 * lgd.cell_height, max(1, int(area.height * 0.8)))
+        for group in all_windows.floating_groups:
+            for window in group:
+                window.show_title_bar = False
+            x = next(
+                layout_dimension(
+                    area.left + (area.width - width) // 2,
+                    width,
+                    lgd.cell_width,
+                    ((group.decoration('left'), group.decoration('right')),),
+                    alignment=0,
+                )
+            )
+            y = next(
+                layout_dimension(
+                    area.top + (area.height - height) // 2,
+                    height,
+                    lgd.cell_height,
+                    ((group.decoration('top'), group.decoration('bottom')),),
+                    alignment=0,
+                )
+            )
+            group.set_geometry(window_geometry_from_layouts(x, y))
 
     def layout_docks(self, all_windows: WindowList) -> None:
         for dock, area in self.os_window_dock_placements:

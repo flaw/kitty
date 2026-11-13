@@ -635,6 +635,10 @@ def create_os_window(
 def update_window_title(os_window_id: int, tab_id: int, window_id: int, title: str) -> None:
     pass
 
+def set_window_floating(os_window_id: int, tab_id: int, window_id: int, floating: bool, border_width: int) -> None:
+    pass
+
+
 def update_window_visibility(os_window_id: int, tab_id: int, window_id: int, visible: bool) -> None:
     pass
 
