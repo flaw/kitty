@@ -151,6 +151,29 @@ make them available in the newly spawned shell.
 Then proceed with ``make`` or ``make app`` according to the platform specific
 instructions above.
 
+Signing a local macOS app
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To sign a packaged app with a code-signing certificate already present in your
+login keychain, provide its name or hash when building::
+
+    nix-shell shell.nix --run 'make app SIGN_IDENTITY="Kitty Local Development"'
+
+You can list available identities with ``security find-identity -v -p codesigning``.
+To sign an already built ``kitty.app`` without rebuilding::
+
+    nix-shell shell.nix --run 'make sign-app SIGN_IDENTITY="Kitty Local Development"'
+
+This fork defaults to ``SIGN_IDENTITY="Kitty Local Development"``, so
+``nix-shell shell.nix --run 'make app'`` builds and signs with that certificate.
+Use ``SIGN_IDENTITY=-`` for ad-hoc signing without a certificate, or
+``SIGN_IDENTITY=`` to skip signing. The signing helper signs
+Mach-O files and nested bundles inside-out, then verifies the app's signature.
+It does not follow symlinks into external dependencies, alter keychain trust,
+enable hardened runtime or sandboxing, or notarize the app. A self-signed
+certificate is for local use, not equivalent to a Developer ID distribution
+signature. Re-sign after changing any files in the app bundle.
+
 .. _packagers:
 
 Notes for Linux/macOS packagers

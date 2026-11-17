@@ -32,8 +32,20 @@ asan:
 profile:
 	python3 setup.py build $(VVAL) --profile
 
+# Local macOS signing identity (certificate name/hash, or - for ad-hoc).
+# Override through the environment/command line; set empty to skip signing.
+SIGN_IDENTITY ?= Kitty Local Development
+export SIGN_IDENTITY
+
+.PHONY: app sign-app
 app:
 	python3 setup.py kitty.app $(VVAL)
+	@if [ -n "$$SIGN_IDENTITY" ]; then $(MAKE) sign-app; fi
+
+# Re-sign an existing bundle without rebuilding it.
+sign-app:
+	@test -n "$$SIGN_IDENTITY" || { echo 'Set SIGN_IDENTITY to a certificate name/hash, or - for ad-hoc signing' >&2; exit 1; }
+	python3 sign-macos.py --identity "$$SIGN_IDENTITY" kitty.app
 
 linux-package: FORCE
 	rm -rf linux-package

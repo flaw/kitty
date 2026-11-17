@@ -9,6 +9,13 @@ To update |kitty|, :doc:`follow the instructions <binary>`.
 Recent major new features
 ---------------------------
 
+Local macOS build signing
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Support optional local signing with ``make app SIGN_IDENTITY="certificate name"``
+and re-signing existing bundles with ``make sign-app``. Nested code is signed
+inside-out and the resulting app signature is verified.
+
 Floating terminals
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
