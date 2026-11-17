@@ -2,7 +2,7 @@
 with pkgs; let
   inherit (lib) optional optionals;
   inherit (xorg) libX11 libXrandr libXinerama libXcursor libXi libXext;
-  harfbuzzWithCoreText = harfbuzz.override {withCoreText = stdenv.isDarwin;};
+  harfbuzzWithCoreText = harfbuzz.override {withCoreText = stdenv.hostPlatform.isDarwin;};
 in
   with python3Packages;
     mkShell rec {
@@ -11,17 +11,17 @@ in
           harfbuzzWithCoreText
           ncurses
           lcms2
-          xxHash
+          pkgs.xxhash
           simde
           go
           matplotlib
           shader-slang
         ]
-        ++ optionals stdenv.isDarwin [
+        ++ optionals stdenv.hostPlatform.isDarwin [
           libpng
           zlib
         ]
-        ++ optionals stdenv.isLinux [
+        ++ optionals stdenv.hostPlatform.isLinux [
           fontconfig
           libunistring
           libcanberra
@@ -56,12 +56,12 @@ in
           sphinxext-opengraph
           sphinx-design
         ]
-        ++ optionals stdenv.isDarwin [
+        ++ optionals stdenv.hostPlatform.isDarwin [
           imagemagick
           libicns # For the png2icns tool.
         ];
 
-      propagatedBuildInputs = optional stdenv.isLinux libGL;
+      propagatedBuildInputs = optional stdenv.hostPlatform.isLinux libGL;
 
       checkInputs = [
         pillow
@@ -71,7 +71,7 @@ in
       hardeningDisable = ["strictoverflow"];
 
       shellHook =
-        if stdenv.isDarwin
+        if stdenv.hostPlatform.isDarwin
         then ''
           export KITTY_NO_LTO=
           # Add fonts by hand

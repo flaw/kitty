@@ -68,6 +68,9 @@ class WindowGroup:
         self.docks: list[WindowGroup] = []
         self.is_floating = False
         self.floating_visible = True
+        # Requested content size in cells; zero retains the default size.
+        self.floating_width = 0
+        self.floating_height = 0
         # The geometry the layout allocated to this group, includes the area of its docks
         self.allocated_geometry: WindowGeometry | None = None
 
@@ -143,6 +146,8 @@ class WindowGroup:
             ans['dock'] = self.dock_as_dict()
         if self.is_floating:
             ans['floating_visible'] = self.floating_visible
+            ans['floating_width'] = self.floating_width
+            ans['floating_height'] = self.floating_height
         if self.docks:
             ans['docks'] = [d.serialize_state() for d in self.docks]
         return ans
@@ -170,6 +175,8 @@ class WindowGroup:
             ans['dock'] = self.dock_as_dict()
         if self.is_floating:
             ans['floating_visible'] = self.floating_visible
+            ans['floating_width'] = self.floating_width
+            ans['floating_height'] = self.floating_height
         if self.docks:
             ans['docks'] = [d.id for d in self.docks]
         return ans
@@ -728,6 +735,8 @@ class WindowList:
         os_window_dock: bool = False,
         floating: bool = False,
         floating_hidden: bool = False,
+        floating_width: int = 0,
+        floating_height: int = 0,
     ) -> WindowGroup:
         """
         Add a window. When dock is specified a new docked group is created, at
@@ -749,6 +758,8 @@ class WindowList:
             target_group = WindowGroup()
             target_group.is_floating = True
             target_group.floating_visible = not floating_hidden
+            target_group.floating_width = max(0, floating_width)
+            target_group.floating_height = max(0, floating_height)
             make_active = make_active and not floating_hidden
             self.floating_groups.append(target_group)
         if target_group is None and dock is not None:

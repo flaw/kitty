@@ -42,24 +42,35 @@ To toggle a persistent shell centered over the current tab's tiled windows::
     map cmd+f toggle_floating_window
 
 On first use, the shell starts in the focused window's working directory.
+Its title follows the running shell or program, just like a tiled window.
 Subsequent presses show or hide the same terminal, preserving its process,
 working directory and scrollback. Hiding restores focus to the previous tiled
 window or dock. Switching tabs hides the float without terminating it, and
 closing the tab (or its last tiled window) closes its floating terminals too.
 There is no separate OS window or native show/hide animation.
 
-The floating terminal is at most 100 columns by 28 lines and occupies at most
-80% of the tab's content area. It is recentered on resize and does not change
-split sizes or the selected layout. Its background is opaque so that underlying
-terminal contents do not show through. Dragging and interactive resizing of
-floating terminals are not currently supported.
+By default, the floating terminal is at most 100 columns by 28 lines. It can
+be resized with the same ``resize_window wider/narrower/taller/shorter`` actions
+as tiled windows. For example::
+
+    map cmd+shift+l resize_window wider 2
+    map cmd+ctrl+shift+l resize_window narrower 2
+
+Resizing keeps it centered, changes its content size in cells, and does not
+change split sizes or the selected layout. ``resize_window reset`` restores its
+default size. Floating terminals occupy at most 80% of the tab's content area;
+a temporarily smaller viewport does not erase the requested size. Their
+background is opaque so that underlying terminal contents do not show through.
+Mouse dragging and mouse-based resizing are not currently supported.
 
 To launch a specific program in a floating terminal::
 
     map f2 launch --type=floating --cwd=current htop
 
-Use ``--floating-hidden`` to start it hidden. Floating terminals, including their
-visibility, are included when saving :doc:`sessions <sessions>`.
+Use ``--floating-hidden`` to start it hidden, or ``--floating-width`` and
+``--floating-height`` to request a content size in cells. Floating terminals,
+including their visibility and resized dimensions, are included when saving
+:doc:`sessions <sessions>`.
 
 To run multiple commands in a shell, use::
 

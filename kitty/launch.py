@@ -284,6 +284,20 @@ type=bool-set
 Start a :code:`--type=floating` window hidden. Its process remains running.
 
 
+--floating-width
+type=int
+default=0
+Requested content width in cells for :code:`--type=floating`. Zero uses the default.
+The size is limited to 80% of the tab's content area.
+
+
+--floating-height
+type=int
+default=0
+Requested content height in cells for :code:`--type=floating`. Zero uses the default.
+The size is limited to 80% of the tab's content area.
+
+
 --location
 type=choices
 default=default
@@ -686,6 +700,8 @@ class LaunchKwds(TypedDict):
     os_window_dock: bool
     floating: bool
     floating_hidden: bool
+    floating_width: int
+    floating_height: int
     stdin: bytes | None
     hold: bool
     bias: float | None
@@ -832,6 +848,8 @@ def _launch(
         'os_window_dock': False,
         'floating': opts.type == 'floating',
         'floating_hidden': opts.floating_hidden,
+        'floating_width': opts.floating_width,
+        'floating_height': opts.floating_height,
         'stdin': None,
         'hold': False,
         'bias': None,

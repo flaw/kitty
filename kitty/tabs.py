@@ -532,6 +532,10 @@ class Tab:  # {{{
         for g in self.windows.floating_groups:
             groups.append(g)
             dock_args[g.id] = ['--type=floating', '--keep-focus']
+            if g.floating_width:
+                dock_args[g.id].append(f'--floating-width={g.floating_width}')
+            if g.floating_height:
+                dock_args[g.id].append(f'--floating-height={g.floating_height}')
             if not g.floating_visible:
                 dock_args[g.id].append('--floating-hidden')
         os_window_dock_ids: set[int] = set()
@@ -820,11 +824,15 @@ class Tab:  # {{{
                 which = 'taller or shorter' if dock.dock.is_horizontal else 'wider or narrower'
                 return f'A dock at the {dock.dock.edge} edge can only be made {which}'
             return None if self.resize_dock(dock, increment, fraction) else 'Could not resize'
-        increment_as_percent = self.current_layout.bias_increment_for_cell(self.windows, is_horizontal) * increment
-        if fraction:
-            changed = self.current_layout.modify_size_of_window_by_fraction(self.windows, window_id, increment_as_percent, is_horizontal, fraction)
+        group = self.windows.group_for_window(window_id) if window_id in self.windows else None
+        if group is not None and group.is_floating:
+            changed = self.current_layout.resize_floating_group(self.windows, group, increment, is_horizontal, fraction)
         else:
-            changed = self.current_layout.modify_size_of_window(self.windows, window_id, increment_as_percent, is_horizontal)
+            increment_as_percent = self.current_layout.bias_increment_for_cell(self.windows, is_horizontal) * increment
+            if fraction:
+                changed = self.current_layout.modify_size_of_window_by_fraction(self.windows, window_id, increment_as_percent, is_horizontal, fraction)
+            else:
+                changed = self.current_layout.modify_size_of_window(self.windows, window_id, increment_as_percent, is_horizontal)
         if changed:
             self.relayout()
             return None
@@ -895,6 +903,10 @@ class Tab:  # {{{
 
     @ac('win', 'Reset window sizes undoing any dynamic resizing of windows')
     def reset_window_sizes(self) -> None:
+        if (group := self.windows.active_group) is not None and group.is_floating:
+            group.floating_width = group.floating_height = 0
+            self.relayout()
+            return
         if self.current_layout.remove_all_biases():
             self.relayout()
 
@@ -1002,9 +1014,17 @@ class Tab:  # {{{
         os_window_dock: bool = False,
         floating: bool = False,
         floating_hidden: bool = False,
+        floating_width: int = 0,
+        floating_height: int = 0,
     ) -> None:
         if floating:
-            self.windows.add_window(window, floating=True, floating_hidden=floating_hidden)
+            self.windows.add_window(
+                window,
+                floating=True,
+                floating_hidden=floating_hidden,
+                floating_width=floating_width,
+                floating_height=floating_height,
+            )
         else:
             self.current_layout.add_window(
                 self.windows,
@@ -1065,6 +1085,8 @@ class Tab:  # {{{
         launch_request: LaunchRequest | None = None,
         floating: bool = False,
         floating_hidden: bool = False,
+        floating_width: int = 0,
+        floating_height: int = 0,
     ) -> Window:
         """
         Create a new window. When dock is specified, the window is docked to
@@ -1134,6 +1156,8 @@ class Tab:  # {{{
             os_window_dock=os_window_dock,
             floating=floating,
             floating_hidden=floating_hidden,
+            floating_width=floating_width,
+            floating_height=floating_height,
         )
         if marker:
             try:

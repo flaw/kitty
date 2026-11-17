@@ -164,6 +164,68 @@ class TestLayout(BaseTest):
                 self.assertFalse(windows.floating_groups)
                 self.ae(windows.active_window.id, 100)
 
+    def test_floating_window_resize_actions(self):
+        from kitty.tabs import Tab as KittyTab
+
+        for cls in (Tall, Fat, Grid, Horizontal, Vertical, Splits, Stack):
+            with self.subTest(layout=cls.name):
+                layout = create_layout(cls)
+                windows = create_windows(layout, 3)
+                original_set_dimensions = layout._set_dimensions
+                area = [2000, 1200]
+
+                def set_dimensions(all_windows):
+                    original_set_dimensions(all_windows)
+                    width, height = area
+                    lgd.central = Region((0, 0, width - 1, height - 1, width, height))
+                    lgd.cell_width, lgd.cell_height = 10, 20
+
+                layout._set_dimensions = set_dimensions
+                floating = Window(99)
+                group = windows.add_window(floating, floating=True)
+                layout(windows)
+                tab = windows.tab_mem
+                tab.relayout = lambda: layout(windows)
+                original = floating.geometry
+                tiled = [w.geometry for g in windows.groups for w in g]
+                self.ae(KittyTab.resize_window_by(tab, floating.id, 2, True), None)
+                self.ae(floating.geometry.xnum, original.xnum + 2)
+                self.ae(floating.geometry.ynum, original.ynum)
+                self.ae(KittyTab.resize_window_by(tab, floating.id, 2, False), None)
+                self.ae(floating.geometry.ynum, original.ynum + 2)
+                resized = floating.geometry
+                self.ae([w.geometry for g in windows.groups for w in g], tiled)
+                self.assertLessEqual(abs((resized.left + resized.right) / 2 - 1000), 1)
+                self.assertLessEqual(abs((resized.top + resized.bottom) / 2 - 600), 1)
+                windows.set_floating_visible(group, False)
+                layout(windows)
+                windows.set_floating_visible(group, True)
+                layout(windows)
+                self.ae(floating.geometry, resized)
+                # Temporary viewport constraints must not erase the requested size.
+                area[:] = [500, 300]
+                layout(windows)
+                self.assertLessEqual(floating.geometry.xnum * 10, 400)
+                area[:] = [2000, 1200]
+                layout(windows)
+                self.ae(floating.geometry, resized)
+                self.ae(group.as_simple_dict()['floating_width'], resized.xnum)
+                self.ae(group.as_simple_dict()['floating_height'], resized.ynum)
+                self.ae(KittyTab.resize_window_by(tab, floating.id, -2, True), None)
+                self.ae(KittyTab.resize_window_by(tab, floating.id, -2, False), None)
+                # Explicit cell sizes need not retain the default outer box's
+                # leftover compensatory pixels, but the content is identical.
+                self.ae(floating.geometry[:6], original[:6])
+                KittyTab.resize_window_by(tab, floating.id, -10000, True)
+                KittyTab.resize_window_by(tab, floating.id, -10000, False)
+                self.ae((floating.geometry.xnum, floating.geometry.ynum), (10, 3))
+                self.ae(KittyTab.resize_window_by(tab, floating.id, -2, True), 'Could not resize')
+                self.ae(KittyTab.resize_window_by(tab, floating.id, 2, True, 0.5), None)
+                self.assertGreater(floating.geometry.xnum, 10)
+                KittyTab.reset_window_sizes(tab)
+                self.ae(floating.geometry, original)
+                self.ae((group.floating_width, group.floating_height), (0, 0))
+
     def test_hidden_floating_window_and_overlay(self):
         layout = create_layout(Stack)
         windows = create_windows(layout, 2)

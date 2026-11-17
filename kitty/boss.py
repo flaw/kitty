@@ -2917,7 +2917,6 @@ class Boss:
             source = tab.active_window
             tab.new_window(
                 cwd_from=CwdRequest(source) if source is not None else None,
-                override_title='Floating shell',
                 floating=True,
             )
 

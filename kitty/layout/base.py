@@ -730,13 +730,49 @@ class Layout:
             if not group.is_floating and (geom := group.geometry) is not None:
                 self.blank_rects.extend(blank_rects_for_window(geom))
 
+    def resize_floating_group(self, all_windows: WindowList, group: WindowGroup, increment: float, is_horizontal: bool, fraction: float = 0) -> bool:
+        if not group.is_floating or group.geometry is None or not increment:
+            return False
+        self._set_dimensions(all_windows)
+        geom = group.geometry
+        if is_horizontal:
+            available = max(1, int(lgd.central.width * 0.8))
+            decorations = group.decoration('left') + group.decoration('right')
+            maximum = max(1, (available - decorations) // lgd.cell_width)
+            current = geom.xnum
+            minimum = min(10, maximum)
+        else:
+            available = max(1, int(lgd.central.height * 0.8))
+            decorations = group.decoration('top') + group.decoration('bottom')
+            maximum = max(1, (available - decorations) // lgd.cell_height)
+            current = geom.ynum
+            minimum = min(3, maximum)
+        delta = round(increment)
+        if fraction:
+            remaining = maximum - current if increment > 0 else current - minimum
+            delta = fractional_resize_steps(remaining, fraction) * (1 if increment > 0 else -1)
+        size = max(minimum, min(maximum, current + delta))
+        if size == current:
+            return False
+        if is_horizontal:
+            group.floating_width = size
+        else:
+            group.floating_height = size
+        return True
+
     def layout_floating_groups(self, all_windows: WindowList) -> None:
         # Use the tab content area, not the monitor or the focused split. Hidden
         # floats also get geometry so their PTYs launch and survive resizes.
         area = lgd.central
-        width = min(100 * lgd.cell_width, max(1, int(area.width * 0.8)))
-        height = min(28 * lgd.cell_height, max(1, int(area.height * 0.8)))
+        max_width = max(1, int(area.width * 0.8))
+        max_height = max(1, int(area.height * 0.8))
         for group in all_windows.floating_groups:
+            width = min(100 * lgd.cell_width, max_width)
+            height = min(28 * lgd.cell_height, max_height)
+            if group.floating_width:
+                width = min(max_width, group.floating_width * lgd.cell_width + group.decoration('left') + group.decoration('right'))
+            if group.floating_height:
+                height = min(max_height, group.floating_height * lgd.cell_height + group.decoration('top') + group.decoration('bottom'))
             for window in group:
                 window.show_title_bar = False
             x = next(

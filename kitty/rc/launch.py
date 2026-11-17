@@ -32,6 +32,8 @@ class Launch(RemoteCommand):
     tab_title/str: Title for the new tab
     type/choices.window.floating.window-dock.tab.tab-dock.os-window-dock.os-window.os-panel.overlay.overlay-main.background.clipboard.primary: Window type
     floating_hidden/bool: Boolean indicating whether to start a floating terminal hidden
+    floating_width/int: Requested floating terminal width in cells, or zero for the default
+    floating_height/int: Requested floating terminal height in cells, or zero for the default
     dock_edge/choices.left.top.right.bottom: The edge at which to place a docked window
     dock_size/str: The size of a docked window as a number of cells or a percentage
     dock_skip_focus/bool: Boolean indicating whether the docked window should never get keyboard focus
