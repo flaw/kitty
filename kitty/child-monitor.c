@@ -696,7 +696,7 @@ parse_input(ChildMonitor *self) {
     if (input_held) mark_os_windows_with_held_input();
     else
         for (size_t i = 0; i < global_state.num_os_windows; i++) global_state.os_windows[i].input_held = false;
-    if (reload_config_called) { call_boss(load_config_file, NULL); }
+    if (reload_config_called) { call_boss(auto_reload_config_file, NULL); }
     return input_read;
 }
 
@@ -915,6 +915,13 @@ prepare_to_render_os_window(
 #define TD os_window->tab_bar_render_data
     bool needs_render = os_window->needs_render;
     os_window->needs_render = false;
+    if (os_window->toast.text) {
+        if (now >= os_window->toast.expires_at) {
+            Py_CLEAR(os_window->toast.text);
+            Py_CLEAR(os_window->toast.render_data.screen);
+            needs_render = true;
+        } else set_maximum_wait(os_window->toast.expires_at - now);
+    }
     bool was_previously_rendered_with_layers = os_window->needs_layers;
     os_window->needs_layers =
         (!global_state.supports_framebuffer_srgb || effective_os_window_alpha(os_window) < 1.f || os_window->live_resize.in_progress ||
@@ -1162,6 +1169,7 @@ render_prepared_os_window(
         }
         if (layer == 0) draw_rounded_borders(br, active_window_bg, num_visible_windows, all_windows_have_same_bg, os_window);
     }
+    draw_toast(os_window, now);
     setup_os_window_for_rendering(os_window, tab, active_window, false, now);
     if (global_state.thumbnail_callback.os_window == os_window->id) {
         thumbnail_callback(os_window);

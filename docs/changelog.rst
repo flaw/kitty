@@ -9,6 +9,16 @@ To update |kitty|, :doc:`follow the instructions <binary>`.
 Recent major new features
 ---------------------------
 
+In-window status toasts
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add brief, non-focus-taking :ref:`status toasts <in_window_toasts>` rendered
+inside kitty, using the terminal font and cell renderer with square pane-style
+borders, and no additional terminal process or OS window. Session saves report
+success after writing the file, manual config reloads report completion, and
+save/config errors retain their detailed error UI. Add the ``show_toast`` action
+for custom mappings. Bells and desktop notifications are unchanged.
+
 Local macOS build signing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 

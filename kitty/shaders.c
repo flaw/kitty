@@ -18,6 +18,7 @@
 #include "window_logo.h"
 #include "srgb_gamma.h"
 #include "state.h"
+#include "wcswidth.h"
 
 enum {
     CELL_PROGRAM,
@@ -1725,6 +1726,76 @@ render_a_bar(const UIRenderData *ui, WindowBarData *bar, PyObject *title, Viewpo
     return border_rect.height;
 }
 
+void
+draw_toast(OSWindow *os_window, monotonic_t now) {
+    if (!os_window->toast.text || now >= os_window->toast.expires_at || !os_window->fonts_data) return;
+    Region central, tab_bar;
+    os_window_regions(os_window, &central, &tab_bar);
+    const unsigned cw = os_window->fonts_data->fcm.cell_width, ch = os_window->fonts_data->fcm.cell_height;
+    const unsigned border = os_window->toast.border_width, margin = cw;
+    const unsigned padding_y = MAX(2u, ch / 4);
+    const unsigned width = central.right > central.left ? central.right - central.left + 1 : 0;
+    const unsigned available_height = central.bottom > central.top ? central.bottom - central.top + 1 : 0;
+    if (!cw || !ch || width <= 2 * (margin + border) || available_height <= ch + 2 * (margin + border + padding_y)) return;
+    const unsigned max_columns = MIN(80u, (width - 2 * (margin + border)) / cw);
+    if (max_columns < 3) return;
+
+    // Draw through an ordinary terminal Screen: same face, cell metrics,
+    // shaping, ligatures and fallback fonts as the panes. This Screen has no
+    // child process, input handling, history or cursor.
+    char_type text[503] = {' '};
+    size_t count = 1;
+    unsigned columns = 0;
+    WCSState wcstate;
+    initialize_wcs_state(&wcstate);
+    const Py_ssize_t length = PyUnicode_GET_LENGTH(os_window->toast.text);
+    for (Py_ssize_t i = 0; i < length && count < arraysz(text) - 2; i++) {
+        char_type cp = PyUnicode_READ_CHAR(os_window->toast.text, i);
+        int delta = wcswidth_step(&wcstate, cp);
+        if ((int)columns + delta > (int)max_columns - 2) break;
+        columns = MAX(0, (int)columns + delta);
+        text[count++] = cp;
+    }
+    text[count++] = ' ';
+    columns += 2;
+    WindowRenderData *rd = &os_window->toast.render_data;
+    Screen *screen = rd->screen;
+    if (!screen || os_window->toast.needs_render || screen->columns != columns || screen->cell_size.width != cw || screen->cell_size.height != ch ||
+        os_window->toast.fonts_data != os_window->fonts_data) {
+        Screen *fresh = (Screen *)PyObject_CallFunction((PyObject *)&Screen_Type, "OIIIII", Py_None, 1u, columns, 0u, cw, ch);
+        if (!fresh) {
+            PyErr_Print();
+            return;
+        }
+        Py_XSETREF(rd->screen, fresh);
+        screen = fresh;
+        screen->modes.mDECTCEM = false;
+        screen->color_profile->configured.default_fg = (DynamicColor){.type = COLOR_IS_RGB, .rgb = OPT(foreground)};
+        screen->color_profile->configured.default_bg = (DynamicColor){.type = COLOR_IS_RGB, .rgb = OPT(background)};
+        screen->color_profile->dirty = true;
+        screen_draw_text(screen, text, count);
+        os_window->toast.needs_render = false;
+        os_window->toast.fonts_data = os_window->fonts_data;
+    }
+    if (rd->vao_idx < 0) rd->vao_idx = create_cell_vao();
+    Viewport rect = {
+        .left = central.left + width - margin - columns * cw - 2 * border,
+        .top = central.top + margin,
+        .width = columns * cw + 2 * border,
+        .height = ch + 2 * (border + padding_y),
+    };
+    color_type accent = os_window->toast.is_error ? OPT(bell_border_color) : (OPT(active_border_color) >= 0 ? OPT(active_border_color) : OPT(foreground));
+    draw_rounded_rect(rect, os_window->viewport_height, border, 0, accent, OPT(background), 1.f, OPT(background), 1.f);
+    rd->geometry = (WindowGeometry){
+        .left = rect.left + border,
+        .top = rect.top + border + padding_y,
+        .right = rect.left + border + columns * cw,
+        .bottom = rect.top + border + padding_y + ch,
+    };
+    send_cell_data_to_gpu(rd->vao_idx, screen, os_window);
+    draw_cells(rd, os_window, true, true, false, NULL, NULL, now);
+}
+
 static bool
 show_hyperlink_targets_with_modifiers(int mods) {
     switch (OPT(show_hyperlink_targets)) {
@@ -2554,7 +2625,8 @@ draw_cells(
     // A floating terminal must occlude the panes beneath it even when the OS
     // window is transparent or uses a background image.
     const bool floating = window && window->floating;
-    float bg_alpha = floating ? 1.f : effective_os_window_alpha(os_window);
+    const bool toast = srd == &os_window->toast.render_data;
+    float bg_alpha = floating || toast ? 1.f : effective_os_window_alpha(os_window);
 
     color_type default_bg = cell_update_uniform_block(
         srd->vao_idx, screen, uniform_buffer, color_table_buffer, &screen->cursor_render_info, os_window, current_inactive_text_alpha, bg_alpha);
@@ -2580,7 +2652,7 @@ draw_cells(
         .grd = grman_render_data(grman),
         .window_logo = wl,
         .inactive_text_alpha = current_inactive_text_alpha,
-        .has_background_image = !floating && has_bgimage(os_window),
+        .has_background_image = !floating && !toast && has_bgimage(os_window),
         .background_color = default_bg,
         .bg_alpha = bg_alpha,
         .now = now,

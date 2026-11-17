@@ -2904,6 +2904,28 @@ class Boss:
     def input_unicode_character(self) -> None:
         self.run_kitten_with_metadata('unicode_input', window=self.window_for_dispatch)
 
+    def _show_toast(self, message: str, *, is_error: bool = False, os_window_id: int = 0) -> None:
+        from .fast_data_types import pt_to_px, set_os_window_toast
+
+        # Terminal titles and user-supplied messages can contain control codes.
+        # A toast is deliberately a short, single-line status message.
+        message = ' '.join(''.join(c for c in message if c.isprintable() or c.isspace()).split())[:500]
+        if not message:
+            return
+        if not os_window_id:
+            tm = self.active_tab_manager_with_dispatch
+            if tm is None:
+                return
+            os_window_id = tm.os_window_id
+        if os_window_id in self.os_window_map:
+            width, unit = get_options().window_border_width
+            border_width = pt_to_px(width, os_window_id) if unit == 'pt' else round(width)
+            set_os_window_toast(os_window_id, message, 4.0 if is_error else 2.0, is_error, max(0, border_width))
+
+    @ac('misc', 'Show a brief, non-focus-taking message inside the kitty OS window')
+    def show_toast(self, message: str) -> None:
+        self._show_toast(message)
+
     @ac('win', 'Toggle a persistent, centered floating shell belonging to the current tab')
     def toggle_floating_window(self) -> None:
         tab = self.active_tab
@@ -3789,10 +3811,12 @@ class Boss:
             map f5 load_config_file /path/to/some/kitty.conf
         """,
     )
-    def load_config_file(self, *paths: str, apply_overrides: bool = True, overrides: Sequence[str] = ()) -> None:
+    def load_config_file(self, *paths: str, apply_overrides: bool = True, overrides: Sequence[str] = (), show_feedback: bool = True) -> None:
         from .cli import default_config_paths
         from .config import load_config
 
+        tm = self.active_tab_manager_with_dispatch
+        feedback_window = tm.os_window_id if tm is not None else 0
         old_opts = get_options()
         prev_paths = old_opts.all_config_paths or default_config_paths(self.args.config)
         paths = paths or prev_paths
@@ -3821,6 +3845,16 @@ class Boss:
         from .shaders.slang import clear_caches
 
         clear_caches()
+        if feedback_window and (show_feedback or bad_lines):
+            self._show_toast(
+                _('Configuration has errors') if bad_lines else _('Configuration reloaded'),
+                is_error=bool(bad_lines),
+                os_window_id=feedback_window,
+            )
+
+    def auto_reload_config_file(self) -> None:
+        # The config watcher reloads via SIGUSR1; only errors need feedback.
+        self.load_config_file(show_feedback=False)
 
         from .launch_wrapper import clear_caches
 

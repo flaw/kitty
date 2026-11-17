@@ -343,6 +343,11 @@ def neighboring_window(func: str, rest: str) -> FuncArgsType:
     return func, [rest]
 
 
+@func_with_args('show_toast')
+def show_toast(func: str, rest: str) -> FuncArgsType:
+    return func, [rest]
+
+
 @func_with_args('resize_window')
 def resize_window(func: str, rest: str) -> FuncArgsType:
     vals = rest.strip().split(maxsplit=1)

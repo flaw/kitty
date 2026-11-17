@@ -750,8 +750,14 @@ def save_as_session_part2(boss: BossType, opts: SaveAsSessionOptions, path: str,
         # Never overwrite an existing session file with an empty one
         show_nothing_to_save_error(boss, opts)
         return
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    atomic_save(session.encode(), path)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        atomic_save(session.encode(), path)
+    except OSError as error:
+        boss._show_toast(_('Session save failed'), is_error=True)
+        boss.show_error(_('Failed to save session'), _('Could not save session to {0}: {1}').format(path, error))
+        return
+    boss.show_toast(_('Session saved'))
     if not opts.save_only:
         boss.edit_file(path)
 

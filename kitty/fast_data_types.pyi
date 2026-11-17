@@ -639,6 +639,10 @@ def set_window_floating(os_window_id: int, tab_id: int, window_id: int, floating
     pass
 
 
+def set_os_window_toast(os_window_id: int, text: str, duration: float, is_error: bool, border_width: int) -> None:
+    pass
+
+
 def update_window_visibility(os_window_id: int, tab_id: int, window_id: int, visible: bool) -> None:
     pass
 

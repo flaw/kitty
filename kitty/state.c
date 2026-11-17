@@ -311,6 +311,7 @@ add_os_window(void) {
     zero_at_ptr(ans);
     ans->id = ++global_state.os_window_id_counter;
     ans->tab_bar_render_data.vao_idx = create_cell_vao();
+    ans->toast.render_data.vao_idx = -1;
     ans->background_opacity.alpha = OPT(background_opacity);
     ans->created_at = monotonic();
     init_shader_animation_state(ans);
@@ -610,6 +611,9 @@ destroy_os_window_item(OSWindow *w) {
         remove_tab_inner(w, tab->id);
     }
     Py_CLEAR(w->window_title);
+    Py_CLEAR(w->toast.text);
+    Py_CLEAR(w->toast.render_data.screen);
+    if (w->toast.render_data.vao_idx >= 0) free_vao(w->toast.render_data.vao_idx);
     Py_CLEAR(w->tab_bar_render_data.screen);
     free_vao(w->tab_bar_render_data.vao_idx);
     free(w->tabs);
@@ -1521,6 +1525,28 @@ PYWRAP1(update_window_visibility) {
 }
 
 
+PYWRAP1(set_os_window_toast) {
+    id_type os_window_id;
+    PyObject *text;
+    double duration;
+    int is_error;
+    unsigned int border_width;
+    PA("KUdpI", &os_window_id, &text, &duration, &is_error, &border_width);
+    if (!isfinite(duration) || duration <= 0 || duration > 60) {
+        PyErr_SetString(PyExc_ValueError, "Toast duration must be greater than zero and at most 60 seconds");
+        return NULL;
+    }
+    WITH_OS_WINDOW(os_window_id)
+    Py_XSETREF(os_window->toast.text, Py_NewRef(text));
+    os_window->toast.expires_at = monotonic() + s_double_to_monotonic_t(duration);
+    os_window->toast.is_error = is_error;
+    os_window->toast.border_width = border_width;
+    os_window->toast.needs_render = true;
+    os_window->needs_render = true;
+    END_WITH_OS_WINDOW
+    Py_RETURN_NONE;
+}
+
 PYWRAP1(sync_os_window_title) {
     id_type os_window_id;
     PA("K", &os_window_id);
@@ -2236,6 +2262,7 @@ static PyMethodDef module_methods[] = {
     MW(set_window_title_bar_render_data, METH_VARARGS),
     MW(set_window_render_data, METH_VARARGS),
     MW(set_window_floating, METH_VARARGS),
+    MW(set_os_window_toast, METH_VARARGS),
     MW(set_window_drag_overlay, METH_VARARGS),
     MW(set_window_padding, METH_VARARGS),
     MW(viewport_for_window, METH_VARARGS),

@@ -278,6 +278,8 @@ typedef struct {
 #define scroll_offset_lines_for_screen(screen) \
     ((pixel_scroll_enabled(screen) && (screen)->cell_size.height) ? (float)(rendered_pixel_scroll_offset_y(screen) / (double)(screen)->cell_size.height) : 0.f)
 
+extern PyTypeObject Screen_Type;
+
 void screen_align(Screen *);
 void screen_garbage_collect_text_cache(Screen *screen);
 void screen_restore_cursor(Screen *);
