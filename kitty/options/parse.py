@@ -1022,6 +1022,12 @@ class Parser:
         for k, v in filter_notification(val, ans["filter_notification"]):
             ans["filter_notification"][k] = v
 
+    def floating_window_height(self, val: str, ans: dict[str, typing.Any]) -> None:
+        ans['floating_window_height'] = unit_float(val)
+
+    def floating_window_width(self, val: str, ans: dict[str, typing.Any]) -> None:
+        ans['floating_window_width'] = unit_float(val)
+
     def focus_follows_mouse(self, val: str, ans: dict[str, typing.Any]) -> None:
         val = val.lower()
         if val not in self.choices_for_focus_follows_mouse:

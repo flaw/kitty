@@ -174,6 +174,31 @@ enable hardened runtime or sandboxing, or notarize the app. A self-signed
 certificate is for local use, not equivalent to a Developer ID distribution
 signature. Re-sign after changing any files in the app bundle.
 
+Installing a local macOS build
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+From the checkout, run::
+
+    make local-install
+
+This enters ``shell.nix`` automatically, runs ``make app`` with signing enabled,
+and installs into ``/Applications/Kitty-Custom.app``. No dependencies are
+installed outside Nix. Quit the destination app and its quick-access panels
+first; the installer refuses to replace a running app. If you are using that
+kitty, run the command from Terminal.app instead.
+
+To choose another location::
+
+    KITTY_INSTALL_DEST="$HOME/Applications/Kitty-Custom.app" make local-install
+
+Or invoke ``./local-install.sh /absolute/path/Kitty-Custom.app`` directly.
+``SIGN_IDENTITY`` overrides the signing identity as with ``make app``; an empty
+value skips signing. The installer copies into a fresh staging directory with
+``ditto``, verifies the signature, and replaces the destination without merging
+old bundle contents. An existing app is retained as a timestamped sibling backup;
+remove old backups manually once satisfied. The installer does not launch the
+app, alter kitty configuration, uninstall Homebrew packages, or use ``sudo``.
+
 .. _packagers:
 
 Notes for Linux/macOS packagers

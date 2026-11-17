@@ -368,6 +368,8 @@ option_names = (
     'exe_search_path',
     'file_transfer_confirmation_bypass',
     'filter_notification',
+    'floating_window_height',
+    'floating_window_width',
     'focus_follows_mouse',
     'font_family',
     'font_features',
@@ -595,6 +597,8 @@ class Options:
     enable_audio_bell: bool = True
     enabled_layouts: list[str] = ['fat', 'grid', 'horizontal', 'splits', 'stack', 'tall', 'vertical']
     file_transfer_confirmation_bypass: str = ''
+    floating_window_height: float = 0.7
+    floating_window_width: float = 0.75
     focus_follows_mouse: choices_for_focus_follows_mouse = 'no'
     font_family: FontSpec = FontSpec(family=None, style=None, postscript_name=None, full_name=None, system='monospace', axes=(), variable_name=None, features=(), created_from_string='monospace')
     font_size: float = 11.0

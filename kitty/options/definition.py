@@ -1931,6 +1931,31 @@ color.
 )
 
 opt(
+    'floating_window_width',
+    '0.75',
+    option_type='unit_float',
+    long_text="""
+Default width of a :ref:`floating terminal <floating_windows>` as a fraction of
+its tab's content area. For example, 0.75 uses 75% of the width. Values above
+0.8 are limited to 0.8. The size follows the parent OS window as it is resized.
+An explicit cell size set by a resize action or :option:`launch --floating-width`
+overrides this default until :code:`resize_window reset` is used.
+""",
+)
+
+opt(
+    'floating_window_height',
+    '0.70',
+    option_type='unit_float',
+    long_text="""
+Default height of a :ref:`floating terminal <floating_windows>` as a fraction of
+its tab's content area. For example, 0.70 uses 70% of the height. Values above
+0.8 are limited to 0.8. Explicit height resizing overrides this default until
+:code:`resize_window reset` is used. See also :opt:`floating_window_width`.
+""",
+)
+
+opt(
     'active_border_color',
     '#00ff00',
     option_type='to_color_or_none',

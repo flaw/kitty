@@ -37,7 +37,12 @@ profile:
 SIGN_IDENTITY ?= Kitty Local Development
 export SIGN_IDENTITY
 
-.PHONY: app sign-app
+.PHONY: app sign-app local-install
+
+# This entry point enters shell.nix itself; no need to run make from a Nix shell.
+local-install:
+	bash ./local-install.sh
+
 app:
 	python3 setup.py kitty.app $(VVAL)
 	@if [ -n "$$SIGN_IDENTITY" ]; then $(MAKE) sign-app; fi

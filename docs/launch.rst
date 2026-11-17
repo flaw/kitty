@@ -49,16 +49,19 @@ window or dock. Switching tabs hides the float without terminating it, and
 closing the tab (or its last tiled window) closes its floating terminals too.
 There is no separate OS window or native show/hide animation.
 
-By default, the floating terminal is at most 100 columns by 28 lines. It can
-be resized with the same ``resize_window wider/narrower/taller/shorter`` actions
-as tiled windows. For example::
+By default, the floating terminal uses 75% of the tab's content width and 70%
+of its height, following the parent OS window when it is resized. Configure
+these proportions with :opt:`floating_window_width` and :opt:`floating_window_height`.
+It can also be resized with the same ``resize_window wider/narrower/taller/shorter``
+actions as tiled windows. For example::
 
     map cmd+shift+l resize_window wider 2
     map cmd+ctrl+shift+l resize_window narrower 2
 
 Resizing keeps it centered, changes its content size in cells, and does not
 change split sizes or the selected layout. ``resize_window reset`` restores its
-default size. Floating terminals occupy at most 80% of the tab's content area;
+default proportional size. An explicit width or height remains fixed in cells
+until reset. Floating terminals occupy at most 80% of each content dimension;
 a temporarily smaller viewport does not erase the requested size. Their
 background is opaque so that underlying terminal contents do not show through.
 Mouse dragging and mouse-based resizing are not currently supported.

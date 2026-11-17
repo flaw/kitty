@@ -766,9 +766,10 @@ class Layout:
         area = lgd.central
         max_width = max(1, int(area.width * 0.8))
         max_height = max(1, int(area.height * 0.8))
+        opts = get_options()
         for group in all_windows.floating_groups:
-            width = min(100 * lgd.cell_width, max_width)
-            height = min(28 * lgd.cell_height, max_height)
+            width = min(max_width, max(1, int(area.width * opts.floating_window_width)))
+            height = min(max_height, max(1, int(area.height * opts.floating_window_height)))
             if group.floating_width:
                 width = min(max_width, group.floating_width * lgd.cell_width + group.decoration('left') + group.decoration('right'))
             if group.floating_height:

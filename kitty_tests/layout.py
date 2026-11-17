@@ -164,6 +164,46 @@ class TestLayout(BaseTest):
                 self.assertFalse(windows.floating_groups)
                 self.ae(windows.active_window.id, 100)
 
+    def test_floating_window_proportional_size(self):
+        layout = create_layout(Tall)
+        windows = create_windows(layout, 2)
+        floating = Window(99)
+        group = windows.add_window(floating, floating=True)
+        original_set_dimensions = layout._set_dimensions
+        area = [2000, 1200]
+
+        def set_dimensions(all_windows):
+            original_set_dimensions(all_windows)
+            width, height = area
+            lgd.central = Region((40, 60, 40 + width - 1, 60 + height - 1, width, height))
+            lgd.cell_width, lgd.cell_height = 10, 20
+
+        layout._set_dimensions = set_dimensions
+
+        def check(width_fraction, height_fraction):
+            layout(windows)
+            geom = floating.geometry
+            self.assertLessEqual(abs((geom.left + geom.right) / 2 - (40 + area[0] / 2)), 1)
+            self.assertLessEqual(abs((geom.top + geom.bottom) / 2 - (60 + area[1] / 2)), 1)
+            # Decoration and whole-cell rounding account for the difference.
+            self.assertLessEqual(abs(geom.xnum * 10 - area[0] * width_fraction), 16)
+            self.assertLessEqual(abs(geom.ynum * 20 - area[1] * height_fraction), 26)
+
+        check(0.75, 0.70)
+        self.assertGreater(floating.geometry.xnum, 100)
+        self.assertGreater(floating.geometry.ynum, 28)
+        area[:] = [1000, 600]
+        check(0.75, 0.70)
+        self.ae((group.floating_width, group.floating_height), (0, 0))
+        self.set_options({'tab_bar_style': 'hidden', 'floating_window_width': 0.6, 'floating_window_height': 0.5})
+        check(0.6, 0.5)
+        self.set_options({'tab_bar_style': 'hidden', 'floating_window_width': 1.0, 'floating_window_height': 1.0})
+        check(0.8, 0.8)
+        self.set_options({'tab_bar_style': 'hidden', 'floating_window_width': 0.0, 'floating_window_height': 0.0})
+        layout(windows)
+        self.assertGreaterEqual(floating.geometry.xnum, 0)
+        self.assertGreaterEqual(floating.geometry.ynum, 0)
+
     def test_floating_window_resize_actions(self):
         from kitty.tabs import Tab as KittyTab
 

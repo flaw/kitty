@@ -12,12 +12,21 @@ Recent major new features
 Local macOS build signing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Add ``make local-install`` to build and sign through Nix, stage and verify a
+clean app copy, and replace a stopped local installation while retaining a
+backup of the previous app.
+
 Support optional local signing with ``make app SIGN_IDENTITY="certificate name"``
 and re-signing existing bundles with ``make sign-app``. Nested code is signed
 inside-out and the resulting app signature is verified.
 
 Floating terminals
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Floating terminals now default to 75% of their parent content width and 70% of
+its height, rather than a fixed cell-size cap. Configure these proportions with
+:opt:`floating_window_width` and :opt:`floating_window_height`. Explicit keyboard
+resizing still preserves requested cell dimensions until reset.
 
 Add tab-owned :ref:`floating terminals <floating_windows>` rendered above tiled
 windows without creating a separate OS window. The ``toggle_floating_window``
